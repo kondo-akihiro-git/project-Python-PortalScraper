@@ -1,16 +1,18 @@
+# app/main.py
 import requests
-
 from config import (
     BASE_URL,
     BASIC_AUTH_ID,
     BASIC_AUTH_PASS,
     LOGIN_ID,
     LOGIN_PASS,
+    WEEKLY_REPORT_URL
 )
 from logger import setup_logger
 from auth_basic import access_with_basic_auth
 from auth_login import login
 from fetch_page import fetch_page
+from set_values import set_values
 
 
 def main():
@@ -37,9 +39,17 @@ def main():
         logger,
     )
 
-    fetch_page(
+    # fetch_page(
+    #     session,
+    #     BASE_URL,
+    #     BASIC_AUTH_ID,
+    #     BASIC_AUTH_PASS,
+    #     logger,
+    # )
+
+    set_values(
         session,
-        BASE_URL,
+        WEEKLY_REPORT_URL,
         BASIC_AUTH_ID,
         BASIC_AUTH_PASS,
         logger,

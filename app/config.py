@@ -10,3 +10,5 @@ BASIC_AUTH_PASS = os.getenv("BASIC_AUTH_PASS")
 
 LOGIN_ID = os.getenv("LOGIN_ID")
 LOGIN_PASS = os.getenv("LOGIN_PASS")
+
+WEEKLY_REPORT_URL = os.getenv("WEEKLY_REPORT_URL")
