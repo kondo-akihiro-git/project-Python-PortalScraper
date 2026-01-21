@@ -3,6 +3,9 @@ import os
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+def format_text(text: str) -> str:
+    # タブと半角スペースのみ削除（全角スペースは残す）
+    return text.replace("\t", "").replace(" ", "")
 
 def fetch_page(session, base_url, basic_id, basic_pass, logger):
     logger.info("fetch weekly report")
@@ -16,7 +19,8 @@ def fetch_page(session, base_url, basic_id, basic_pass, logger):
     )
 
     html = fetch_html(session, url, basic_id, basic_pass)
-    save_txt(html)
+    save_weekly_txt(html)
+    save_learning_txt(html) 
 
 # HTMLページ取得
 def fetch_html(session, url, bid, bpw):
@@ -24,8 +28,8 @@ def fetch_html(session, url, bid, bpw):
     res.raise_for_status()
     return res.text
 
-# ファイル保存
-def save_txt(html):
+# 「作業内容」をファイル保存
+def save_weekly_txt(html):
     soup = BeautifulSoup(html, "html.parser")
 
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -60,6 +64,38 @@ def save_txt(html):
 
     return path
 
-def format_text(text: str) -> str:
-    # タブと半角スペースのみ削除（全角スペースは残す）
-    return text.replace("\t", "").replace(" ", "")
+
+# 「直近で学んだこと、覚えたこと」をファイル保存
+def save_learning_txt(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = os.path.join(base, "files")
+    os.makedirs(out, exist_ok=True)
+
+    ts = datetime.now().strftime("%m%d_%H%M%S")
+    path = os.path.join(out, f"learning_{ts}.txt")
+
+    target_div = None
+
+    # 「直近で学んだこと、覚えたこと」を含むdivを探す
+    for div in soup.find_all("div"):
+        if div.get_text(strip=True).startswith("直近で学んだこと"):
+            target_div = div
+            break
+
+    if not target_div:
+        return path
+
+    content = target_div.find("div", class_="readonly_area")
+    if not content:
+        return path
+
+    raw = content.get_text(separator="")
+    txt = format_text(raw)
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("■直近で学んだこと、覚えたこと\n")
+        f.write(txt)
+
+    return path
