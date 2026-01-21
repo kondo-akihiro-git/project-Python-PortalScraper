@@ -10,7 +10,7 @@ from config import (
 from logger import setup_logger
 from auth_basic import access_with_basic_auth
 from auth_login import login
-from fetch_page import fetch_top_page
+from fetch_page import fetch_page
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
         logger,
     )
 
-    fetch_top_page(
+    fetch_page(
         session,
         BASE_URL,
         BASIC_AUTH_ID,
