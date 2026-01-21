@@ -21,6 +21,7 @@ def fetch_page(session, base_url, basic_id, basic_pass, logger):
     html = fetch_html(session, url, basic_id, basic_pass)
     save_weekly_txt(html)
     save_learning_txt(html) 
+    save_comment_txt(html) 
 
 # HTMLページ取得
 def fetch_html(session, url, bid, bpw):
@@ -96,6 +97,43 @@ def save_learning_txt(html):
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("■直近で学んだこと、覚えたこと\n")
+        f.write(txt)
+
+    return path
+
+
+# 「コメント欄」をファイル保存
+def save_comment_txt(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = os.path.join(base, "files")
+    os.makedirs(out, exist_ok=True)
+
+    ts = datetime.now().strftime("%m%d_%H%M%S")
+    path = os.path.join(out, f"comment_{ts}.txt")
+
+    target_div = None
+
+    # 「コメント欄」を含むdivを探す
+    for div in soup.find_all("div"):
+        text = div.get_text(strip=True)
+        if text.startswith("コメント欄"):
+            target_div = div
+            break
+
+    if not target_div:
+        return path
+
+    content = target_div.find("div", class_="readonly_area")
+    if not content:
+        return path
+
+    raw = content.get_text(separator="")
+    txt = format_text(raw)
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("■コメント欄\n")
         f.write(txt)
 
     return path
