@@ -1,28 +1,30 @@
 # app/fetch_page.py
 from requests.auth import HTTPBasicAuth
-import os
-from datetime import datetime
 from bs4 import BeautifulSoup
 
 def format_text(text: str) -> str:
     # タブと半角スペースのみ削除（全角スペースは残す）
     return text.replace("\t", "").replace(" ", "")
 
-def fetch_page(session, base_url, basic_id, basic_pass, logger):
+def fetch_page(session, base_url, basic_id, basic_pass, logger, member_no, year_month, week_num):
+    """
+    指定週の週報ページを取得し、作業内容・学習内容・コメントを抽出して返す
+    """
     logger.info("fetch weekly report")
 
-    url = (
-        "https://eba-report.xyz/weekly_report"
-        "?member_no=668"
-        "&weekly_report_year_month=2026-01"
-        "&weekly_report_week_num=3"
-        "&display=1"
-    )
-
+    url = build_url(base_url, member_no, year_month, week_num)
     html = fetch_html(session, url, basic_id, basic_pass)
-    save_weekly_txt(html)
-    save_learning_txt(html) 
-    save_comment_txt(html) 
+
+    # HTML解析してデータ抽出
+    weekly_data = extract_weekly_data(html)
+    learning_data = extract_learning_data(html)
+    comment_data = extract_comment_data(html)
+
+    return {
+        "weekly": weekly_data,
+        "learning": learning_data,
+        "comment": comment_data,
+    }
 
 # HTMLページ取得
 def fetch_html(session, url, bid, bpw):
@@ -30,111 +32,71 @@ def fetch_html(session, url, bid, bpw):
     res.raise_for_status()
     return res.text
 
-# 「作業内容」をファイル保存
-def save_weekly_txt(html):
+# 「作業内容」を抽出
+def extract_weekly_data(html):
     soup = BeautifulSoup(html, "html.parser")
+    data = []
 
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out = os.path.join(base, "files")
-    os.makedirs(out, exist_ok=True)
+    table = soup.find("table", id="weekly_report_list")
+    if not table:
+        return data
 
-    ts = datetime.now().strftime("%m%d_%H%M%S")
-    path = os.path.join(out, f"weekly_{ts}.txt")
+    for tr in table.find("tbody").find_all("tr"):
+        tds = tr.find_all("td")
+        if len(tds) < 4:
+            continue
 
-    with open(path, "w", encoding="utf-8") as f:
-        tbl = soup.find("table", id="weekly_report_list")
-        if not tbl:
-            return path
+        day = tds[0].get_text(strip=True)
+        div = tds[3].find("div", class_="readonly_area")
+        content = format_text(div.get_text(separator="")) if div else ""
+        data.append({"day": day, "content": content})
 
-        for tr in tbl.find("tbody").find_all("tr"):
-            tds = tr.find_all("td")
-            if len(tds) < 4:
-                continue
+    return data
 
-            # 日付
-            d = tds[0].get_text(strip=True)
-            f.write(f"■日付:{d}\n")
-
-            # 作業内容の抽出
-            div = tds[3].find("div", class_="readonly_area")
-            if div:
-                raw = div.get_text(separator="")
-                txt = format_text(raw)
-                f.write(txt)
-
-            f.write("\n\n" + "-" * 100 + "\n\n")
-
-    return path
-
-
-# 「直近で学んだこと、覚えたこと」をファイル保存
-def save_learning_txt(html):
+# 「直近で学んだこと、覚えたこと」を抽出
+def extract_learning_data(html):
     soup = BeautifulSoup(html, "html.parser")
-
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out = os.path.join(base, "files")
-    os.makedirs(out, exist_ok=True)
-
-    ts = datetime.now().strftime("%m%d_%H%M%S")
-    path = os.path.join(out, f"learning_{ts}.txt")
+    data = ""
 
     target_div = None
-
-    # 「直近で学んだこと、覚えたこと」を含むdivを探す
     for div in soup.find_all("div"):
         if div.get_text(strip=True).startswith("直近で学んだこと"):
             target_div = div
             break
 
-    if not target_div:
-        return path
+    if target_div:
+        content = target_div.find("div", class_="readonly_area")
+        if content:
+            data = format_text(content.get_text(separator=""))
 
-    content = target_div.find("div", class_="readonly_area")
-    if not content:
-        return path
+    return data
 
-    raw = content.get_text(separator="")
-    txt = format_text(raw)
-
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("■直近で学んだこと、覚えたこと\n")
-        f.write(txt)
-
-    return path
-
-
-# 「コメント欄」をファイル保存
-def save_comment_txt(html):
+# 「コメント欄」を抽出
+def extract_comment_data(html):
     soup = BeautifulSoup(html, "html.parser")
-
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out = os.path.join(base, "files")
-    os.makedirs(out, exist_ok=True)
-
-    ts = datetime.now().strftime("%m%d_%H%M%S")
-    path = os.path.join(out, f"comment_{ts}.txt")
+    data = ""
 
     target_div = None
-
-    # 「コメント欄」を含むdivを探す
     for div in soup.find_all("div"):
-        text = div.get_text(strip=True)
-        if text.startswith("コメント欄"):
+        if div.get_text(strip=True).startswith("コメント欄"):
             target_div = div
             break
 
-    if not target_div:
-        return path
+    if target_div:
+        content = target_div.find("div", class_="readonly_area")
+        if content:
+            data = format_text(content.get_text(separator=""))
 
-    content = target_div.find("div", class_="readonly_area")
-    if not content:
-        return path
+    return data
 
-    raw = content.get_text(separator="")
-    txt = format_text(raw)
-
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("■コメント欄\n")
-        f.write(txt)
-
-    return path
+def build_url(base_url: str, member_no: int, year_month: str, week_num: int, display: int = 1) -> str:
+    """
+    get_weekから取得した週情報を使ってURLを作成
+    """
+    return (
+        f"{base_url}/weekly_report"
+        f"?member_no={member_no}"
+        f"&weekly_report_year_month={year_month}"
+        f"&weekly_report_week_num={week_num}"
+        f"&display={display}"
+    )

@@ -3,24 +3,10 @@ from requests.auth import HTTPBasicAuth
 from bs4 import BeautifulSoup
 
 
-# ===== テストデータ定義 =====
-TEST_WORKING_MEMOS = [
-    "【テスト】作業内容1",
-    "【テスト】作業内容2",
-    "【テスト】作業内容3",
-    "【テスト】作業内容4",
-    "【テスト】作業内容5",
-    "【テスト】作業内容6",
-    "【テスト】作業内容7",
-]
-
-TEST_LEARNING = "【テスト】直近で学んだこと"
-TEST_COMMENT = "【テスト】コメント欄"
-
-
-def set_values(session, url, basic_id, basic_pass, logger):
+def set_values(session, url, basic_id, basic_pass, logger, data):
+    url = build_url(url)
     html = fetch_html(session, url, basic_id, basic_pass)
-    set_value(session, url, basic_id, basic_pass, html, logger)
+    set_value(session, url, basic_id, basic_pass, html, logger, data)
 
 
 def fetch_html(session, url, bid, bpw):
@@ -29,7 +15,7 @@ def fetch_html(session, url, bid, bpw):
     return res.text
 
 
-def set_value(session, url, basic_id, basic_pass, html, logger):
+def set_value(session, url, basic_id, basic_pass, html, logger, data):
     soup = BeautifulSoup(html, "html.parser")
 
     form = soup.find("form", id="weekly_report")
@@ -48,7 +34,7 @@ def set_value(session, url, basic_id, basic_pass, html, logger):
         rows = table.find("tbody").find_all("tr")
 
         for idx, tr in enumerate(rows):
-            if idx >= len(TEST_WORKING_MEMOS):
+            if idx >= len(data["weekly"]):
                 break
 
             textarea = tr.find("textarea", attrs={"name": True})
@@ -59,15 +45,15 @@ def set_value(session, url, basic_id, basic_pass, html, logger):
 
             # working_memo のみ対象
             if name.endswith("[working_memo]"):
-                payload[name] = TEST_WORKING_MEMOS[idx]
+                payload[name] = data["weekly"][idx]["content"]
 
     # ===== 直近で学んだこと =====
     if form.find("textarea", attrs={"name": "studying_memo"}):
-        payload["studying_memo"] = TEST_LEARNING
+        payload["studying_memo"] = data.get("learning", "")
 
     # ===== コメント欄 =====
     if form.find("textarea", attrs={"name": "comment"}):
-        payload["comment"] = TEST_COMMENT
+        payload["comment"] = data.get("comment", "")
 
     # 保存
     payload["save"] = "1"
@@ -82,3 +68,12 @@ def set_value(session, url, basic_id, basic_pass, html, logger):
     res.raise_for_status()
 
     logger.info("保存完了")
+
+
+def build_url(base_url: str) -> str:
+    """
+    get_weekから取得した週情報を使ってURLを作成
+    """
+    return (
+        f"{base_url}/weekly_report"
+    )
